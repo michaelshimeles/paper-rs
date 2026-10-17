@@ -76,6 +76,25 @@ cargo build --release && ./target/release/paper-rs --demo
 It runs on X11 and Wayland through Vulkan, or GL as a fallback. Shortcuts use Ctrl. File
 dialogs use the XDG desktop portal.
 
+### Windows
+
+Install Rust with [rustup](https://rustup.rs) and the
+[Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the
+"Desktop development with C++" workload (the linker). On Windows on ARM, use the ARM64 rustup
+(`rustc -vV` shows `host: aarch64-pc-windows-msvc`) and also select the MSVC ARM64 build tools,
+which that toolchain needs to link. An x64 toolchain also works, but it builds an x64 binary
+that runs under emulation.
+
+```powershell
+cargo build --release
+.\target\release\paper-rs.exe --demo
+```
+
+It uses Vulkan or DirectX 12 through wgpu. Shortcuts use Ctrl, and file dialogs are the native
+Windows ones. Projects go in your Documents folder (OneDrive's, if Documents is redirected
+there). It has been run natively on Windows 11 ARM64; the x64 build has been run only under
+x64 emulation on that machine (see Known gaps).
+
 ### Headless (servers, CI)
 
 No display is needed. wgpu renders offscreen, through Mesa lavapipe when there is no GPU:
@@ -103,9 +122,9 @@ the editor like a user edit: one undo step per call, and the window repaints imm
   both can run. Loopback only; requests from browsers (with an `Origin` header) and foreign
   `Host` headers are rejected. `PAPER_RS_MCP_PORT=NNNN` changes the port; `PAPER_RS_MCP=0`
   turns the server off.
-* **stdio**: `paper-rs-mcp` (built next to `paper-rs`) relays stdio to the running app. It
-  lists the tools even when the app is closed, and tells the agent to start paper-rs if a
-  call can't reach it.
+* **stdio**: `paper-rs-mcp` (built next to `paper-rs`; `paper-rs-mcp.exe` on Windows) relays
+  stdio to the running app. It lists the tools even when the app is closed, and tells the
+  agent to start paper-rs if a call can't reach it.
 
 ### Claude Code
 
@@ -190,7 +209,7 @@ cargo test --release --test perf -- --nocapture   # 10k-element frame timings
 | 4. Excalidraw core | `milestone4_whiteboard.png` |
 | 5. Inspector, palette, shortcuts | `milestone5_inspector.png`, `milestone5_palette.png`, `milestone5_shortcuts.png` |
 | 6. Import / export | `milestone6_pdf_page.png` (PDF rasterized by pdftoppm), `milestone6_excalidraw_import.png`, `milestone6_svg_import.png` |
-| 7. MCP server | `milestone7_mcp.png` (a screen written through `write_html`, captured with `get_screenshot`), `milestone7_mcp_live_xvfb.png` (the live app after Claude Code drew into it over the stdio bridge) |
+| 7. MCP server | `milestone7_mcp.png` (a screen written through `write_html`, captured with `get_screenshot`), `milestone7_mcp_live_xvfb.png` (the live app after Claude Code drew into it over the stdio bridge), `milestone7_mcp_live_windows_arm64.png` (the same on Windows 11 ARM64, over HTTP and the bridge) |
 | paper-rs 0.1 | `m1_*` … `m6_*`, `app_demo.png`, `x11_window_xvfb.png` |
 
 ## Using it
@@ -286,6 +305,10 @@ Known gaps), ⏳ planned in a later milestone, ❌ not planned.
 * **Not run on macOS hardware yet.** The macOS build type-checks and uses only portable APIs
   (Metal via wgpu, winit, rfd), but it has not been launched on a Mac. On Linux, the real
   window was exercised under Xvfb; the screenshot is `x11_window_xvfb.png`.
+* **Windows** has been run on one machine: Windows 11 ARM64 (Snapdragon X Elite, Adreno
+  X1-85), natively. The x64 build was run there under x64 emulation, not on x64 hardware.
+  `paper-rs.exe` is a console program, so starting it from Explorer also opens a console
+  window (which carries the log and the CLI output).
 * **Pen pressure.** winit 0.30 does not expose tablet pressure for pen events that arrive as
   mouse input, which is common with macOS and Wacom tablets. Pressure comes from touch/pen
   `force` when the platform reports it. Otherwise it is simulated from stroke velocity.
