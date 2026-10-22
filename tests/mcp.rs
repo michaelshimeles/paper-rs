@@ -393,6 +393,36 @@ fn errors_are_reported_not_panics() {
 }
 
 #[test]
+fn svg_view_box_scales_the_icon_to_its_size() {
+    let mut h = host();
+    let ab = call(
+        &mut h,
+        "create_artboard",
+        json!({"name": "Icons", "styles": {"width": "200px", "height": "100px"}}),
+    );
+    // A 48-unit icon drawn at 18 px. HTML parsing lowercases attribute names, so `viewBox`
+    // has to keep its case when the <svg> goes to the importer.
+    let r = call(
+        &mut h,
+        "write_html",
+        json!({
+            "targetNodeId": ab["id"], "mode": "insert-children",
+            "html": r##"<svg width="18" height="18" viewBox="0 0 48 48"><path d="M0 0H48V48H0Z" fill="#000"/></svg>"##,
+        }),
+    );
+    let icon = num(&r["createdNodeIds"][0]);
+    let doc = &h.ed.doc;
+    let frame = doc.get(icon).unwrap();
+    assert_eq!((frame.rect.w, frame.rect.h), (18.0, 18.0));
+    let shape = doc.get(frame.children[0]).unwrap();
+    assert!(
+        (shape.rect.w - 18.0).abs() < 0.01 && (shape.rect.h - 18.0).abs() < 0.01,
+        "{:?}",
+        shape.rect
+    );
+}
+
+#[test]
 fn screenshot_returns_png() {
     if sketch_rs::render::gpu::Headless::new().is_err() {
         eprintln!("no GPU adapter; skipping");

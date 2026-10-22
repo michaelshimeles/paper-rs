@@ -1887,7 +1887,7 @@ impl Builder<'_, '_> {
             if matches!(k.as_str(), "width" | "height" | "style") {
                 continue;
             }
-            open += &format!(" {k}=\"{}\"", v.replace('"', "&quot;"));
+            open += &format!(" {}=\"{}\"", svg_attr_name(k), v.replace('"', "&quot;"));
         }
         if !el.attrs.iter().any(|(k, _)| k == "xmlns") {
             open += " xmlns=\"http://www.w3.org/2000/svg\"";
@@ -2754,6 +2754,19 @@ fn undo_redo(ed: &mut Editor, a: &Args, undo: bool) -> ToolResult {
         (ed.history.generation() != before).then(|| ed.status.clone())
     });
     text(json!({"done": label.is_some(), "what": label}))
+}
+
+/// The HTML parser lowercases attribute names. Put the `<svg>` attributes that SVG spells in
+/// camelCase back in their case before the markup goes to usvg, like the HTML spec's "adjust SVG
+/// attributes" step. Without this, `viewbox` is ignored and the content is not scaled.
+fn svg_attr_name(k: &str) -> &str {
+    match k {
+        "viewbox" => "viewBox",
+        "preserveaspectratio" => "preserveAspectRatio",
+        "baseprofile" => "baseProfile",
+        "zoomandpan" => "zoomAndPan",
+        _ => k,
+    }
 }
 
 #[cfg(test)]
