@@ -859,8 +859,7 @@ impl ApplicationHandler<UserEvent> for App {
             crate::macos::inset_traffic_lights(&window, x, y);
             self.menu = Some(crate::macos::install_menu());
         }
-        let instance =
-            wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
+        let instance = wgpu::Instance::new(crate::render::gpu::instance_descriptor());
         let surface = instance
             .create_surface(window.clone())
             .expect("create surface");

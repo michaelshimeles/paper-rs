@@ -10,6 +10,26 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
+/// Instance options for every wgpu instance in the app: `WGPU_BACKEND` when it is set, else
+/// every backend except GL on Windows.
+///
+/// On Windows, starting Vulkan and GL in one process can crash the app at launch with
+/// STATUS_ACCESS_VIOLATION (0xc0000005). Seen on a laptop with an AMD iGPU and an NVIDIA
+/// RTX GPU. Windows always has Vulkan or DX12, so GL stays available through `WGPU_BACKEND=gl`.
+pub fn instance_descriptor() -> wgpu::InstanceDescriptor {
+    let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
+    desc.backends = default_backends(desc.backends, cfg!(windows));
+    desc.with_env()
+}
+
+fn default_backends(backends: wgpu::Backends, windows: bool) -> wgpu::Backends {
+    if windows {
+        backends - wgpu::Backends::GL
+    } else {
+        backends
+    }
+}
+
 pub const MSAA: u32 = 4;
 
 /// Colors are authored in sRGB and blended in gamma space (like egui), so targets are non-sRGB.
@@ -731,8 +751,7 @@ pub struct Headless {
 
 impl Headless {
     pub fn new() -> Result<Headless, String> {
-        let instance =
-            wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
+        let instance = wgpu::Instance::new(instance_descriptor());
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::LowPower,
             force_fallback_adapter: false,
@@ -843,5 +862,23 @@ impl Headless {
         );
         self.queue.submit([enc.finish()]);
         self.read(&tex)
+    }
+}
+
+#[cfg(test)]
+mod backend_tests {
+    use super::default_backends;
+    use wgpu::Backends;
+
+    #[test]
+    fn windows_leaves_gl_out_by_default() {
+        let b = default_backends(Backends::all(), true);
+        assert!(!b.contains(Backends::GL));
+        assert!(b.contains(Backends::VULKAN | Backends::DX12));
+    }
+
+    #[test]
+    fn other_platforms_keep_every_backend() {
+        assert_eq!(default_backends(Backends::all(), false), Backends::all());
     }
 }
