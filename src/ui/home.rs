@@ -88,7 +88,14 @@ fn plural(n: u64, unit: &str) -> String {
     }
 }
 
-pub fn draw(ui: &mut Ui, hv: &mut HomeView, native_chrome: bool, translucent: bool) {
+pub fn draw(
+    ui: &mut Ui,
+    hv: &mut HomeView,
+    native_chrome: bool,
+    translucent: bool,
+    options: &mut crate::options::Options,
+    options_dirty: &mut bool,
+) {
     let p = theme::pal(ui);
     egui::Panel::left("home-sidebar")
         .resizable(false)
@@ -150,6 +157,8 @@ pub fn draw(ui: &mut Ui, hv: &mut HomeView, native_chrome: bool, translucent: bo
                         .font(theme::semibold(17.0)),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    super::theme_button(ui, options, options_dirty);
+                    ui.add_space(6.0);
                     if hv.show_trash {
                         if ui
                             .add_enabled(!hv.trash.is_empty(), egui::Button::new("Empty Trash"))

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Sketch
+GenericName=Infinite Canvas
+Comment=A native infinite-canvas app for planning, working and sketching
+Exec=sketch-rs %f
+Icon=sketch-rs
+Terminal=false
+Categories=Graphics;VectorGraphics;2DGraphics;
+Keywords=canvas;sketch;diagram;whiteboard;draw;design;
+StartupNotify=true
+# The Wayland app id and the X11 class name of the window, both set in the app.
+StartupWMClass=sketch-rs

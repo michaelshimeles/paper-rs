@@ -11,7 +11,7 @@ use sketch_rs::geom::{Rect, V2, v2};
 use sketch_rs::io::{file, png, svg};
 use sketch_rs::model::{Color, Node, NodeId, NodeKind};
 use sketch_rs::render::frame;
-use sketch_rs::render::scene::{self, ACCENT, CANVAS_BG, GUIDE};
+use sketch_rs::render::scene::{self, ACCENT, CANVAS_BG_LIGHT, GUIDE};
 use sketch_rs::ui::UiState;
 
 #[test]
@@ -36,8 +36,8 @@ fn m1_infinite_canvas_pan_and_zoom() {
     a.save(shot("m1_canvas.png")).unwrap();
     assert!(close(px(&a, v2(160.0, 140.0)), ACCENT, 2));
     assert!(
-        close(px(&a, v2(400.0, 400.0)), CANVAS_BG, 2)
-            || close(px(&a, v2(400.0, 400.0)), scene::GRID_DOT, 4)
+        close(px(&a, v2(400.0, 400.0)), CANVAS_BG_LIGHT, 2)
+            || close(px(&a, v2(400.0, 400.0)), scene::GRID_DOT_LIGHT, 4)
     );
 
     // Pan with the wheel, then zoom 3x about a cursor point using Ctrl+wheel.
@@ -320,8 +320,8 @@ fn m3_shapes_frames_and_text() {
         "overflow rect drawn inside the frame"
     );
     assert!(
-        close(px(&img, v2(600.0, 440.0)), CANVAS_BG, 4)
-            || close(px(&img, v2(600.0, 440.0)), scene::GRID_DOT, 4),
+        close(px(&img, v2(600.0, 440.0)), CANVAS_BG_LIGHT, 4)
+            || close(px(&img, v2(600.0, 440.0)), scene::GRID_DOT_LIGHT, 4),
         "clipped by frame"
     );
     assert!(
@@ -556,18 +556,55 @@ fn app_full_ui_screenshot() {
         close(
             img.get_pixel(20, 600).0,
             {
-                let c = sketch_rs::theme::palette(false).sidebar;
+                let c = sketch_rs::theme::palette(true).sidebar;
                 Color::rgb(c.r(), c.g(), c.b())
             },
             3
         ),
-        "layers panel (light sidebar)"
+        "layers panel (dark sidebar)"
     );
     let bg = img.get_pixel(1300, 1600).0;
     assert!(
-        close(bg, CANVAS_BG, 3) || close(bg, scene::GRID_DOT, 4),
+        close(bg, scene::CANVAS_BG_DARK, 3) || close(bg, scene::GRID_DOT_DARK, 4),
         "canvas background {bg:?}"
     );
+}
+
+#[test]
+fn ui_theme_choice_switches_chrome_and_canvas() {
+    let Some(g) = gpu() else { return };
+    use sketch_rs::options::ThemeChoice;
+    let mut e = demo::showcase();
+    let mut st = UiState::default();
+    let sidebar = |dark: bool| {
+        let c = sketch_rs::theme::palette(dark).sidebar;
+        Color::rgb(c.r(), c.g(), c.b())
+    };
+
+    st.options.theme = ThemeChoice::Light;
+    let light = frame::capture(g, &mut e, &mut st, [800.0, 500.0], 2.0, |_| {});
+    st.options.theme = ThemeChoice::Dark;
+    let dark = frame::capture(g, &mut e, &mut st, [800.0, 500.0], 2.0, |_| {});
+
+    assert!(
+        close(light.get_pixel(20, 600).0, sidebar(false), 3),
+        "light sidebar"
+    );
+    assert!(
+        close(dark.get_pixel(20, 600).0, sidebar(true), 3),
+        "dark sidebar"
+    );
+    let canvas = |img: &image::RgbaImage, dark: bool| {
+        let (bg, dot) = if dark {
+            (scene::CANVAS_BG_DARK, scene::GRID_DOT_DARK)
+        } else {
+            (scene::CANVAS_BG_LIGHT, scene::GRID_DOT_LIGHT)
+        };
+        let p = img.get_pixel(1000, 600).0;
+        close(p, bg, 3) || close(p, dot, 4)
+    };
+    assert!(canvas(&light, false), "light canvas");
+    assert!(canvas(&dark, true), "dark canvas");
 }
 
 #[test]

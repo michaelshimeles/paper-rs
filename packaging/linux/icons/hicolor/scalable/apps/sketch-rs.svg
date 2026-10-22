@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e9e9ef"/>
+    </linearGradient>
+    <pattern id="dots" width="64" height="64" patternUnits="userSpaceOnUse" x="16" y="16">
+      <circle cx="32" cy="32" r="6" fill="#cfcfd8"/>
+    </pattern>
+    <clipPath id="body">
+      <rect x="100" y="100" width="824" height="824" rx="186"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#body)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#face)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#dots)"/>
+  </g>
+  <rect x="101" y="101" width="822" height="822" rx="185" fill="none" stroke="#000" stroke-opacity="0.08" stroke-width="2"/>
+  <path d="M318 612 C 362 470, 436 418, 486 470 S 548 640, 610 600 S 676 430, 712 404"
+        fill="none" stroke="#1d1d1f" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="252" y="330" width="520" height="364" fill="none" stroke="#2f6ff3" stroke-width="14"/>
+  <g fill="#ffffff" stroke="#2f6ff3" stroke-width="12">
+    <rect x="228" y="306" width="48" height="48" rx="6"/>
+    <rect x="748" y="306" width="48" height="48" rx="6"/>
+    <rect x="228" y="670" width="48" height="48" rx="6"/>
+    <rect x="748" y="670" width="48" height="48" rx="6"/>
+  </g>
+</svg>

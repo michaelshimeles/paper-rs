@@ -55,11 +55,11 @@ fn ten_thousand_elements_cache_and_pan_without_rework() {
     e.zoom_to_fit();
     let mut cache = SceneCache::default();
     let t0 = Instant::now();
-    let f1 = scene::canvas(&e, &mut cache, V2::ZERO, true);
+    let f1 = scene::canvas(&e, &mut cache, V2::ZERO, true, false);
     let first = t0.elapsed();
     assert_eq!(cache.last_misses, 10_000);
     let t1 = Instant::now();
-    let f2 = scene::canvas(&e, &mut cache, V2::ZERO, true);
+    let f2 = scene::canvas(&e, &mut cache, V2::ZERO, true, false);
     let second = t1.elapsed();
     assert_eq!(
         cache.last_misses, 0,
@@ -74,7 +74,7 @@ fn ten_thousand_elements_cache_and_pan_without_rework() {
     // Editing one node re-tessellates just that node.
     let id = e.doc.root[5000];
     e.edit("Move", |tx| tx.node_mut(id).unwrap().rect.x += 5.0);
-    scene::canvas(&e, &mut cache, V2::ZERO, true);
+    scene::canvas(&e, &mut cache, V2::ZERO, true, false);
     assert_eq!(cache.last_misses, 1);
 
     // Panning: same items, so the GPU world buffers are reused (no upload).
@@ -83,7 +83,7 @@ fn ten_thousand_elements_cache_and_pan_without_rework() {
     let tex = g.target([800, 500]);
     let view = tex.create_view(&Default::default());
     let mut draw = |e: &Editor, cache: &mut SceneCache| {
-        let f = scene::canvas(e, cache, V2::ZERO, true);
+        let f = scene::canvas(e, cache, V2::ZERO, true, false);
         let mut enc = g.device.create_command_encoder(&Default::default());
         r.render(
             &g.device,

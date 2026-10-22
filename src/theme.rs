@@ -270,15 +270,21 @@ pub fn blend(base: Color32, over: Color32) -> Color32 {
 }
 
 /// Fonts plus light and dark styles. egui picks the one matching the system appearance
-/// (reported by egui-winit); headless rendering falls back to light.
+/// (reported by egui-winit); where the system says nothing, the dark one wins.
 pub fn apply(ctx: &egui::Context) {
     install_fonts(ctx);
-    ctx.options_mut(|o| {
-        o.theme_preference = egui::ThemePreference::System;
-        o.fallback_theme = egui::Theme::Light;
-    });
+    ctx.options_mut(|o| o.fallback_theme = egui::Theme::Dark);
     ctx.style_mut_of(egui::Theme::Light, |s| style_for(s, false));
     ctx.style_mut_of(egui::Theme::Dark, |s| style_for(s, true));
+}
+
+pub fn set_preference(ctx: &egui::Context, choice: crate::options::ThemeChoice) {
+    use crate::options::ThemeChoice as C;
+    ctx.set_theme(match choice {
+        C::System => egui::ThemePreference::System,
+        C::Light => egui::ThemePreference::Light,
+        C::Dark => egui::ThemePreference::Dark,
+    });
 }
 
 /// Thin line icons in the spirit of SF Symbols, drawn into a square `rect`.
@@ -337,6 +343,8 @@ pub enum Icon {
     Laser,
     Library,
     Sketch,
+    Sun,
+    Moon,
 }
 
 pub fn paint_icon(painter: &egui::Painter, rect: Rect, icon: Icon, color: Color32) {
@@ -717,6 +725,20 @@ pub fn paint_icon(painter: &egui::Painter, rect: Rect, icon: Icon, color: Color3
                 .collect();
             line(&pts);
             line(&[pt(2.5, 13.5), pt(13.5, 13.5)]);
+        }
+        Icon::Sun => {
+            painter.circle_stroke(c, 3.4 * u, st);
+            for i in 0..8 {
+                let a = i as f32 * std::f32::consts::TAU / 8.0;
+                line(&[c + Vec2::angled(a) * 5.6 * u, c + Vec2::angled(a) * 7.0 * u]);
+            }
+        }
+        Icon::Moon => {
+            let mut pts = arc(pt(8.0, 8.0), 6.0 * u, 1.15, 5.13, 14);
+            let mut inner = arc(pt(11.0, 8.0), 5.5 * u, 1.67, 4.61, 14);
+            inner.reverse();
+            pts.extend(inner);
+            closed(&pts);
         }
         Icon::Grid => {
             for (x, y) in [(2.5, 2.5), (9.0, 2.5), (2.5, 9.0), (9.0, 9.0)] {

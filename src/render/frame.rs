@@ -69,12 +69,13 @@ impl Painter {
     ) {
         let ppp = layout.output.pixels_per_point;
         let offset = v2(layout.canvas.min.x as f64, layout.canvas.min.y as f64);
-        let frame = scene::canvas(ed, &mut self.cache, offset, show_grid);
+        let dark = ctx.theme() == egui::Theme::Dark;
+        let frame = scene::canvas(ed, &mut self.cache, offset, show_grid, dark);
         let mut enc = device.create_command_encoder(&Default::default());
         let bg = if self.transparent {
             [0.0; 4]
         } else {
-            scene::CANVAS_BG.to_f32(1.0)
+            scene::canvas_bg(dark).to_f32(1.0)
         };
         self.canvas.render(
             device,
@@ -173,6 +174,7 @@ pub fn capture(
 ) -> image::RgbaImage {
     let ctx = egui::Context::default();
     ui::setup_style(&ctx);
+    crate::theme::set_preference(&ctx, st.options.theme);
     let size = [
         (size_points[0] * ppp).round() as u32,
         (size_points[1] * ppp).round() as u32,

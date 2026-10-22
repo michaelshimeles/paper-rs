@@ -12,10 +12,24 @@ use lyon::tessellation::{FillRule, LineCap};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-pub const CANVAS_BG: Color = Color::rgb(0xee, 0xee, 0xf0);
-pub const GRID_DOT: Color = Color::rgb(0xcf, 0xcf, 0xd6);
+pub const CANVAS_BG_LIGHT: Color = Color::rgb(0xee, 0xee, 0xf0);
+pub const CANVAS_BG_DARK: Color = Color::rgb(0x1e, 0x1e, 0x20);
+pub const GRID_DOT_LIGHT: Color = Color::rgb(0xcf, 0xcf, 0xd6);
+pub const GRID_DOT_DARK: Color = Color::rgb(0x3a, 0x3a, 0x3c);
 pub const ACCENT: Color = Color::rgb(0x2f, 0x6f, 0xf3);
 pub const GUIDE: Color = Color::rgb(0xf2, 0x2f, 0x7a);
+
+pub fn canvas_bg(dark: bool) -> Color {
+    if dark {
+        CANVAS_BG_DARK
+    } else {
+        CANVAS_BG_LIGHT
+    }
+}
+
+pub fn grid_dot(dark: bool) -> Color {
+    if dark { GRID_DOT_DARK } else { GRID_DOT_LIGHT }
+}
 
 pub fn rgba(c: Color) -> [f32; 4] {
     c.to_f32(1.0)
@@ -49,7 +63,7 @@ impl View<'_> {
 }
 
 /// Dot grid whose spacing adapts to the zoom so it never gets too dense or sparse.
-pub fn grid(mb: &mut MeshBuilder, v: &View) {
+pub fn grid(mb: &mut MeshBuilder, v: &View, dark: bool) {
     let z = v.camera.zoom;
     let mut spacing = 20.0;
     while spacing * z < 14.0 {
@@ -63,7 +77,7 @@ pub fn grid(mb: &mut MeshBuilder, v: &View) {
     let y0 = (vis.y / spacing).floor() as i64;
     let x1 = (vis.right() / spacing).ceil() as i64;
     let y1 = (vis.bottom() / spacing).ceil() as i64;
-    let color = rgba(GRID_DOT);
+    let color = rgba(grid_dot(dark));
     let r = 0.9;
     for yi in y0..=y1 {
         for xi in x0..=x1 {
@@ -586,7 +600,13 @@ fn fmt_num(x: f64) -> String {
 }
 
 /// Full interactive canvas: background grid, document, overlay.
-pub fn canvas(ed: &Editor, cache: &mut SceneCache, offset: V2, show_grid: bool) -> CanvasFrame {
+pub fn canvas(
+    ed: &Editor,
+    cache: &mut SceneCache,
+    offset: V2,
+    show_grid: bool,
+    dark: bool,
+) -> CanvasFrame {
     let v = View {
         doc: &ed.doc,
         camera: ed.camera,
@@ -595,9 +615,9 @@ pub fn canvas(ed: &Editor, cache: &mut SceneCache, offset: V2, show_grid: bool) 
     };
     let mut under = MeshBuilder::default();
     under.set_clip(Some(v.canvas_rect()));
-    under.rect(v.canvas_rect(), rgba(CANVAS_BG));
+    under.rect(v.canvas_rect(), rgba(canvas_bg(dark)));
     if show_grid {
-        grid(&mut under, &v);
+        grid(&mut under, &v, dark);
     }
     let vis = ed.camera.visible_world(ed.viewport);
     let bucket = zoom_bucket(ed.camera.zoom);

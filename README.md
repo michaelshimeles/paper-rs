@@ -87,6 +87,17 @@ cargo build --release && ./target/release/sketch-rs --demo
 It runs on X11 and Wayland through Vulkan, or GL as a fallback. Shortcuts use Ctrl. File
 dialogs use the XDG desktop portal.
 
+The desktop entry and the app icon live in `packaging/linux`. Install them into your home to get
+a launcher entry and the Sketch icon in the taskbar and the Alt+Tab switcher:
+
+```sh
+scripts/install-linux-desktop.sh target/release/sketch-rs
+```
+
+The script takes the binary from the PATH when you leave the path out. The icons are rendered
+from the brand icon in `site/scripts/brand/icon.svg`, the same one the Mac build uses, so rerun
+`cargo run --example gen-linux-icons` after changing it.
+
 ### Headless (servers, CI)
 
 No display is needed. wgpu renders offscreen, through Mesa lavapipe when there is no GPU:

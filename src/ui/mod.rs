@@ -44,6 +44,8 @@ pub struct UiState {
     pub layer_drag: Option<(NodeId, Option<LayerDrop>)>,
     /// Row rects of the last layers-panel frame (for drop targeting).
     pub layer_rows: Vec<(NodeId, egui::Rect, usize)>,
+    pub options: crate::options::Options,
+    pub options_dirty: bool,
 }
 
 /// Where a dragged layer lands relative to a row.
@@ -81,10 +83,39 @@ pub(crate) fn title_text(text: impl Into<String>) -> RichText {
     RichText::new(text).font(theme::semibold(theme::BODY))
 }
 
+fn theme_button(ui: &mut Ui, options: &mut crate::options::Options, dirty: &mut bool) {
+    use crate::options::ThemeChoice;
+    let dark = ui.visuals().dark_mode;
+    let (icon, tip) = if dark {
+        (Icon::Moon, "Dark theme")
+    } else {
+        (Icon::Sun, "Light theme")
+    };
+    if theme::icon_button(ui, icon, 24.0, false)
+        .on_hover_text(tip)
+        .clicked()
+    {
+        options.theme = if dark {
+            ThemeChoice::Light
+        } else {
+            ThemeChoice::Dark
+        };
+        theme::set_preference(ui.ctx(), options.theme);
+        *dirty = true;
+    }
+}
+
 /// Lay out the chrome and return the remaining canvas rectangle (logical px).
 pub fn draw(ui: &mut Ui, ed: &mut Editor, st: &mut UiState) -> egui::Rect {
     if let Some(hv) = &mut st.home {
-        home::draw(ui, hv, st.native_chrome, st.translucent_sidebar);
+        home::draw(
+            ui,
+            hv,
+            st.native_chrome,
+            st.translucent_sidebar,
+            &mut st.options,
+            &mut st.options_dirty,
+        );
         return egui::Rect::NOTHING;
     }
     for ev in std::mem::take(&mut ed.ui_events) {
@@ -227,6 +258,8 @@ fn top_bar(ui: &mut Ui, ed: &mut Editor, st: &mut UiState) {
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 2.0;
+            theme_button(ui, &mut st.options, &mut st.options_dirty);
+            ui.add_space(4.0);
             if theme::icon_button(ui, theme::Icon::Question, 26.0, st.show_help)
                 .on_hover_text("Keyboard shortcuts")
                 .clicked()
@@ -795,5 +828,61 @@ fn help(ctx: &egui::Context, st: &mut UiState, canvas: egui::Rect) {
         });
     if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
         st.show_help = false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::options::{Options, ThemeChoice};
+
+    /// Lay the toggle out at the top-left of a small screen and optionally click it.
+    fn frame(ctx: &egui::Context, options: &mut Options, dirty: &mut bool, click: bool) {
+        let mut input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(120.0, 40.0),
+            )),
+            ..Default::default()
+        };
+        if click {
+            let pos = egui::pos2(12.0, 12.0);
+            input.events.push(egui::Event::PointerMoved(pos));
+            for pressed in [true, false] {
+                input.events.push(egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: Default::default(),
+                });
+            }
+        }
+        let mut out = ctx.run_ui(input, |ui| {
+            ui.horizontal(|ui| theme_button(ui, options, dirty));
+        });
+        out.textures_delta.clear();
+    }
+
+    #[test]
+    fn theme_button_flips_between_light_and_dark() {
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let mut options = Options::default();
+        let mut dirty = false;
+
+        frame(&ctx, &mut options, &mut dirty, false);
+        assert_eq!(ctx.theme(), egui::Theme::Dark, "no system theme: dark");
+
+        frame(&ctx, &mut options, &mut dirty, true);
+        assert_eq!(options.theme, ThemeChoice::Light);
+        assert!(dirty, "the choice is written to options.json");
+        assert_eq!(ctx.theme(), egui::Theme::Light);
+
+        dirty = false;
+        frame(&ctx, &mut options, &mut dirty, false);
+        frame(&ctx, &mut options, &mut dirty, true);
+        assert_eq!(options.theme, ThemeChoice::Dark);
+        assert!(dirty);
+        assert_eq!(ctx.theme(), egui::Theme::Dark);
     }
 }

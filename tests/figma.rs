@@ -756,7 +756,7 @@ fn m3_figma_core_screenshot() {
     // Ring: the hole shows the canvas.
     assert!(close(
         at(v2(1225.0, 335.0)),
-        sketch_rs::render::scene::CANVAS_BG,
+        sketch_rs::render::scene::CANVAS_BG_LIGHT,
         6
     ));
     // Radial gradient star: center is yellow, tips are orange.
