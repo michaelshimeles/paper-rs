@@ -1490,6 +1490,8 @@ struct Builder<'t, 'a> {
     page_id: String,
     ignored: BTreeSet<String>,
     warnings: Vec<String>,
+    /// Absolute nodes and their `right` / `bottom` offsets, settled once the layout is done.
+    absolute: Vec<(NodeId, Option<f64>, Option<f64>)>,
 }
 
 impl Builder<'_, '_> {
@@ -1507,14 +1509,20 @@ impl Builder<'_, '_> {
 
     /// Positioning that needs the final size (right/bottom).
     fn place(&mut self, id: NodeId, a: &css::Applied, parent: &Parent) {
-        if let (Some(ps), true) = (parent.size, a.right.is_some() || a.bottom.is_some()) {
-            let n = self.tx.node_mut(id).unwrap();
-            if let Some(r) = a.right {
-                n.rect.x = ps.0 - n.rect.w - r;
-            }
-            if let Some(b) = a.bottom {
-                n.rect.y = ps.1 - n.rect.h - b;
-            }
+        let anchored = a.right.is_some() || a.bottom.is_some();
+        if anchored && let Some(ps) = parent.size {
+            pin(self.tx.node_mut(id).unwrap(), ps, a.right, a.bottom);
+        }
+        // Auto layout skips absolute nodes, and the node or its parent may still grow to fit
+        // content added later (hug sizing): settle them after the relayout.
+        if anchored
+            || self
+                .tx
+                .doc()
+                .get(id)
+                .is_some_and(|n| n.layout_child.absolute)
+        {
+            self.absolute.push((id, a.right, a.bottom));
         }
     }
 
@@ -2091,6 +2099,51 @@ fn create_artboard(ed: &mut Editor, a: &Args) -> ToolResult {
     text(v)
 }
 
+/// Place a node `right` / `bottom` away from its parent's far edges.
+fn pin(n: &mut Node, parent_size: (f64, f64), right: Option<f64>, bottom: Option<f64>) {
+    if let Some(r) = right {
+        n.rect.x = parent_size.0 - n.rect.w - r;
+    }
+    if let Some(b) = bottom {
+        n.rect.y = parent_size.1 - n.rect.h - b;
+    }
+}
+
+/// Settle absolute nodes after the relayout, in two passes. Auto layout skips absolute
+/// children, so an absolute frame with auto layout has not arranged its children or found its
+/// hug size yet.
+///
+/// 1. Lay out every absolute frame. `absolute` is in build order (children before their
+///    parents), so inner frames reach their size before the frames that hug them.
+/// 2. Place right/bottom-anchored nodes again, now that every parent has its final size.
+///
+/// Absolute nodes are out of the flow, so neither pass changes another node's size.
+fn settle_absolute(tx: &mut Tx, absolute: &[(NodeId, Option<f64>, Option<f64>)]) {
+    for &(id, _, _) in absolute {
+        if tx.doc().get(id).is_some_and(|n| n.layout.is_some()) {
+            for _ in 0..6 {
+                if !crate::layout::layout_frame(tx, id) {
+                    break;
+                }
+            }
+        }
+    }
+    for &(id, right, bottom) in absolute {
+        if right.is_none() && bottom.is_none() {
+            continue;
+        }
+        let Some(parent) = tx.doc().get(id).and_then(|n| n.parent) else {
+            continue;
+        };
+        let Some(ps) = tx.doc().get(parent).map(|p| (p.rect.w, p.rect.h)) else {
+            continue;
+        };
+        if let Some(n) = tx.node_mut(id) {
+            pin(n, ps, right, bottom);
+        }
+    }
+}
+
 fn write_html(ed: &mut Editor, a: &Args) -> ToolResult {
     let def = page_arg(ed, a)?;
     let src = a.req_str("html")?;
@@ -2150,6 +2203,7 @@ fn write_html(ed: &mut Editor, a: &Args) -> ToolResult {
                 page_id: page_id.clone(),
                 ignored: BTreeSet::new(),
                 warnings: Vec::new(),
+                absolute: Vec::new(),
             };
             let flex = parent.layout.is_some();
             let made = b.nodes(&tree, &inherited, &parent, &mut index, flex);
@@ -2175,6 +2229,7 @@ fn write_html(ed: &mut Editor, a: &Args) -> ToolResult {
                 }
             }
             relayout(b.tx, parent_id.or(made.first().copied()));
+            settle_absolute(b.tx, &b.absolute);
             let (ig, w) = (b.ignored, b.warnings);
             (made, ig, w)
         })

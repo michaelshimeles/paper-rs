@@ -139,6 +139,145 @@ fn artboard_and_html_become_auto_layout_frames_and_text() {
 }
 
 #[test]
+fn bottom_and_right_use_the_final_sizes() {
+    let mut h = host();
+    let ab = call(
+        &mut h,
+        "create_artboard",
+        json!({"name": "Phone", "styles": {"width": "390px", "height": "844px"}}),
+    );
+    // A search bar pinned to the bottom of a hero block that hugs its content, a text block
+    // pinned to the bottom of a photo that hugs its two lines, and an icon pinned to the right
+    // of a stretched input. Each needs a size that is only known once the block is laid out.
+    let r = call(
+        &mut h,
+        "write_html",
+        json!({
+            "targetNodeId": ab["id"], "mode": "insert-children",
+            "html": r#"<div style="display:flex;flex-direction:column;">
+              <div style="position:relative;padding:4px 16px 28px;display:flex;flex-direction:column;">
+                <div style="position:relative;width:358px;height:272px;">
+                  <div style="position:absolute;left:20px;bottom:46px;display:flex;flex-direction:column;">
+                    <div style="font-size:40px;line-height:1;">Any service,</div>
+                    <div style="font-size:44px;line-height:1;">any time</div>
+                  </div>
+                </div>
+                <div style="position:absolute;left:28px;bottom:0;width:334px;height:56px;"></div>
+              </div>
+              <div style="position:relative;height:50px;">
+                <div style="position:absolute;right:14px;top:15px;width:20px;height:20px;"></div>
+              </div>
+            </div>"#,
+        }),
+    );
+    let doc = &h.ed.doc;
+    let col = doc.get(num(&r["createdNodeIds"][0])).unwrap();
+    let hero = doc.get(col.children[0]).unwrap();
+    assert_eq!(hero.rect.h, 304.0, "{:?}", hero.rect);
+    let photo = doc.get(hero.children[0]).unwrap();
+    let text = doc.get(photo.children[0]).unwrap();
+    assert!(text.rect.h > 80.0, "{:?}", text.rect);
+    let bottom = |n: &sketch_rs::model::Node| n.rect.y + n.rect.h;
+    assert!(
+        (bottom(text) - (272.0 - 46.0)).abs() < 0.5,
+        "{:?}",
+        text.rect
+    );
+    let bar = doc.get(hero.children[1]).unwrap();
+    assert_eq!(bar.rect.y, 248.0, "{:?}", bar.rect);
+    let input = doc.get(col.children[1]).unwrap();
+    let icon = doc.get(input.children[0]).unwrap();
+    assert_eq!(
+        icon.rect.x,
+        input.rect.w - 20.0 - 14.0,
+        "{:?} in {:?}",
+        icon.rect,
+        input.rect
+    );
+}
+
+#[test]
+fn anchors_inside_a_hugging_absolute_frame_use_its_final_size() {
+    let mut h = host();
+    let ab = call(
+        &mut h,
+        "create_artboard",
+        json!({"name": "Nested", "styles": {"width": "200px", "height": "200px"}}),
+    );
+    // An absolute frame that hugs a 50x50 child, with a 20x20 badge 10 px from its right and
+    // bottom edges. The badge must be placed after the frame reaches 50x50.
+    let r = call(
+        &mut h,
+        "write_html",
+        json!({
+            "targetNodeId": ab["id"], "mode": "insert-children",
+            "html": r#"<div style="position:relative;width:200px;height:200px;"><div style="position:absolute;left:0;top:0;display:flex;"><div style="width:50px;height:50px;"></div><div style="position:absolute;right:10px;bottom:10px;width:20px;height:20px;"></div></div></div>"#,
+        }),
+    );
+    let doc = &h.ed.doc;
+    let wrap = doc.get(num(&r["createdNodeIds"][0])).unwrap();
+    let frame = doc.get(wrap.children[0]).unwrap();
+    assert_eq!(
+        (frame.rect.w, frame.rect.h),
+        (50.0, 50.0),
+        "{:?}",
+        frame.rect
+    );
+    let badge = doc.get(frame.children[1]).unwrap();
+    assert_eq!(
+        (badge.rect.x, badge.rect.y),
+        (20.0, 20.0),
+        "{:?}",
+        badge.rect
+    );
+}
+
+#[test]
+fn absolute_auto_layout_frames_arrange_their_children() {
+    let mut h = host();
+    let ab = call(
+        &mut h,
+        "create_artboard",
+        json!({"name": "Search", "styles": {"width": "390px", "height": "300px"}}),
+    );
+    // A search bar: icon, placeholder text that takes the free space, button. Once in the
+    // flow and once absolutely positioned: both must lay out the same way inside the bar.
+    let bar = |pos: &str| {
+        format!(
+            r#"<div style="{pos}width:334px;height:56px;display:flex;flex-direction:row;align-items:center;gap:10px;padding:0 6px 0 18px;box-sizing:border-box;"><div style="width:18px;height:18px;"></div><div style="font-size:15px;line-height:1;flex:1;">Try deep clean</div><div style="width:44px;height:44px;"></div></div>"#
+        )
+    };
+    let html = format!(
+        r#"<div style="position:relative;width:390px;height:300px;">{}{}</div>"#,
+        bar(""),
+        bar("position:absolute;left:28px;top:200px;")
+    );
+    let r = call(
+        &mut h,
+        "write_html",
+        json!({"targetNodeId": ab["id"], "mode": "insert-children", "html": html}),
+    );
+    let doc = &h.ed.doc;
+    let wrap = doc.get(num(&r["createdNodeIds"][0])).unwrap();
+    for &b in &wrap.children {
+        let row = doc.get(b).unwrap();
+        let text = doc.get(row.children[1]).unwrap();
+        // 334 wide, minus padding 18 + 6, the 18 icon, the 44 button and two 10 gaps.
+        assert!((text.rect.w - 228.0).abs() < 0.5, "{:?}", text.rect);
+        assert!(text.rect.h > 10.0, "{:?}", text.rect);
+        assert!((text.rect.x - 46.0).abs() < 0.5, "{:?}", text.rect);
+        // Centered on the cross axis (align-items: center).
+        let mid = text.rect.y + text.rect.h / 2.0;
+        assert!(
+            (mid - 28.0).abs() < 0.5,
+            "{:?} in {:?}",
+            text.rect,
+            row.rect
+        );
+    }
+}
+
+#[test]
 fn reading_tools_describe_the_page() {
     let mut h = host();
     let ab = call(
